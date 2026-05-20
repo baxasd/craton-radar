@@ -8,10 +8,31 @@ from rich.console import Console
 
 import pykinect_azure as pykinect
 from pykinect_azure.k4a import _k4a
+from pykinect_azure.k4a.capture import Capture
 from pykinect_azure.k4a._k4atypes import (
     K4A_DEPTH_MODE_NFOV_UNBINNED,
     K4A_COLOR_RESOLUTION_OFF
 )
+
+# --- MONKEY PATCH pykinect_azure Capture ---
+# Pykinect_azure (0.0.4) has bugs in its capture object management leading to 
+# invalid handles and incorrect instance creation. We patch the methods at 
+# runtime to ensure portability across different environments without modifying
+# the installed library package directly.
+def _patched_release_handle(self):
+    if self.is_valid():
+        _k4a.k4a_capture_release(self._handle)
+        self._handle = None
+
+@staticmethod
+def _patched_create():
+    handle = _k4a.k4a_capture_t()
+    _k4a.VERIFY(_k4a.k4a_capture_create(handle), "Create capture failed!")
+    return Capture(handle)
+
+Capture.release_handle = _patched_release_handle
+Capture.create = _patched_create
+# --- END MONKEY PATCH ---
 
 from core.kinect_writer import KinectWriterThread
 from core.telemetry import TelemetryTracker
