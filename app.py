@@ -19,19 +19,16 @@ class TelemetryTracker:
         self.last = self.start
         self.cap_times = deque(maxlen=100)
         self.disk_times = deque(maxlen=100)
-        self.drops = 0
-        self.q_size = 0
 
     def log_cap(self): self.cap_times.append(time.time())
     def log_disk(self): self.disk_times.append(time.time())
-    def log_drop(self): self.drops += 1
     
     def update(self):
         now = time.time()
         if now - self.last >= self.interval:
             c_fps = (len(self.cap_times)-1)/(self.cap_times[-1]-self.cap_times[0]) if len(self.cap_times)>1 else 0
             d_fps = (len(self.disk_times)-1)/(self.disk_times[-1]-self.disk_times[0]) if len(self.disk_times)>1 else 0
-            print(f"[{now-self.start:.1f}s] CAP: {c_fps:.1f} | DISK: {d_fps:.1f} | Q: {self.q_size} | Drops: {self.drops}")
+            print(f"[{now-self.start:.1f}s] CAP: {c_fps:.1f} | DISK: {d_fps:.1f}")
             self.last = now
 
 class Writer(threading.Thread):
@@ -48,7 +45,6 @@ class Writer(threading.Thread):
                     if item is None: break
                     f.write(item[1])
                     self.tel.log_disk()
-                    self.tel.q_size = self.q.qsize()
                     self.q.task_done()
                 except queue.Empty: continue
 
@@ -56,7 +52,7 @@ def load_settings():
     path = "settings.ini"
     config = configparser.ConfigParser()
     if not os.path.exists(path):
-        config['Radar'] = {'config_file': 'core/config/config.cfg', 'out_dir': 'data', 
+        config['Radar'] = {'config_file': 'core/config.cfg', 'out_dir': 'data', 
                            'queue_maxsize': '300', 'telemetry_interval': '10.0',
                            'auto_detect_ports': 'true', 'cli_port': 'COM3', 'data_port': 'COM4'}
         with open(path, 'w') as f: config.write(f)
@@ -95,7 +91,7 @@ def run_capture():
             if raw:
                 tel.log_cap()
                 try: q.put_nowait((time.perf_counter_ns(), raw))
-                except queue.Full: tel.log_drop()
+                except queue.Full: pass
             tel.update()
             if not raw: time.sleep(0.001)
     except KeyboardInterrupt:
