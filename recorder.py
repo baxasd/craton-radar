@@ -3,6 +3,8 @@ import logging
 import queue
 import os
 import threading
+import json
+import struct
 from datetime import datetime
 from collections import deque
 
@@ -22,7 +24,7 @@ class TelemetryTracker:
 
     def log_cap(self): self.cap_times.append(time.time())
     def log_disk(self): self.disk_times.append(time.time())
-    
+
     def update(self):
         now = time.time()
         if now - self.last >= self.interval:
@@ -32,13 +34,19 @@ class TelemetryTracker:
             self.last = now
 
 class Writer(threading.Thread):
-    def __init__(self, q: queue.Queue, path: str, tel: TelemetryTracker):
+    def __init__(self, q: queue.Queue, path: str, tel: TelemetryTracker, meta: dict = None):
         super().__init__(daemon=True)
         self.q, self.path, self.tel, self.running = q, path, tel, True
+        self.meta = meta
 
     def run(self):
         log.info(f"Writing to {self.path}")
         with open(self.path, 'wb') as f:
+            if self.meta:
+                meta_bytes = json.dumps(self.meta).encode('utf-8')
+                f.write(struct.pack("<I", len(meta_bytes)))
+                f.write(meta_bytes)
+
             while self.running or not self.q.empty():
                 try:
                     item = self.q.get(timeout=0.5)
@@ -53,7 +61,7 @@ def run_capture():
     cfg = config['Radar']
     cfg_file = cfg.get('config_file')
     out_dir = cfg.get('out_dir', 'data')
-    
+
     if not os.path.exists(cfg_file):
         print(f"Error: {cfg_file} not found."); return
 
@@ -62,18 +70,20 @@ def run_capture():
 
     cli, data = RadarSensor.find_ti_ports() if cfg.getboolean('auto_detect_ports') else (cfg.get('cli_port'), cfg.get('data_port'))
     if not cli or not data: print("Error: Ports not found."); return
-            
+
     radar = RadarSensor(cli, data, cfg_file)
     try:
         radar.connect_and_configure()
     except Exception as e:
         print(f"Error: {e}"); return
-    
+
+    meta = radar.get_meta()
+
     q = queue.Queue(maxsize=cfg.getint('queue_maxsize'))
     tel = TelemetryTracker(interval=cfg.getfloat('telemetry_interval'))
-    writer = Writer(q, bin_path, tel)
+    writer = Writer(q, bin_path, tel, meta=meta)
     writer.start()
-    
+
     print("\nCapture started. Press Ctrl+C to stop.")
     try:
         while True:
@@ -89,6 +99,7 @@ def run_capture():
     finally:
         radar.close(); writer.running = False
         try: q.put_nowait(None)
+
         except: pass
         writer.join(timeout=2.0)
         print("Capture complete.")

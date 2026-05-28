@@ -1,25 +1,57 @@
-![Version](https://img.shields.io/badge/version-0.0.1-green)
-![Python](https://img.shields.io/badge/python-3.11-green)
+# Craton Radar
 
-# RawRadar
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://www.python.org/) 
+[![TI mmWave](https://img.shields.io/badge/TI_mmWave-Serial-red.svg?style=flat)](https://www.ti.com/sensors/mmwave/overview.html)
+[![DearPyGui](https://img.shields.io/badge/DearPyGui-2.0-blue.svg?style=flat)](https://github.com/hoffstadt/DearPyGui)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blueviolet.svg?style=flat)](LICENSE)
 
-A minimalist, high-performance CLI tool for raw data acquisition from **Texas Instruments mmWave Radar** sensors.
+A high-performance CLI tool for raw data acquisition and real-time heatmap visualization from Texas Instruments mmWave Radar sensors.
 
-## Features
-*   **Minimalist UI:** Simple console menu for easy operation.
-*   **High Performance:** Multi-threaded architecture for reliable raw data capture.
-*   **Pure Binary Output:** Records raw radar data directly to `.bin` files.
-*   **Live Telemetry:** Real-time console updates on capture and storage performance.
+## Architecture
 
-## Installation
-1.  Python 3.11+
-2.  `pip install -r requirements.txt`
+The system is designed for high-throughput data ingestion and consists of core hardware drivers and visualization nodes:
 
-## Usage
+- **`core/engine.py`**: Handles serial communication, hardware configuration (CLI), and TLV frame parsing.
+- **`core/settings.py`**: Manages persistence and auto-generation of global defaults in `settings.ini`.
+- **`recorder.py`**: Headless CLI interface for multi-threaded binary data recording and live telemetry.
+- **`calibrator.py`**: Real-time visualizer providing a physics-corrected Range-Doppler Heatmap using DearPyGui and SciPy.
+
+## Binary File Structure
+
+Captured data is saved in a raw stream format. Each `.bin` file begins with a metadata header containing the configuration used during capture.
+
+### 1. Metadata Header (File Start)
+- **Length**: `4 bytes` (uint32, little-endian). Length of the JSON string.
+- **Content**: `N bytes` (UTF-8 encoded JSON string). Contains:
+  - `config`: Radar commands, resolutions (range/doppler), and bin counts.
+  - `timestamp`: Start time of the recording.
+
+### 2. Frame Data Stream (Sequential)
+- **TI Magic Word**: `8 bytes` (`02 01 04 03 06 05 08 07`).
+- **Header**: `32 bytes` (Version, Total Length, Frame Number, CPU Cycles, etc.).
+- **TLV Payload**: Variable length block containing detected objects and heatmaps as defined in the radar configuration.
+
+## Installation & Usage
+
+### Setup
+1. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+### Execution
+Run the application to start the data acquisition CLI:
 ```bash
-python app.py
+python recorder.py
 ```
-Follow the on-screen menu to start or stop capture.
+A `settings.ini` file will be generated on first run. Configure your COM ports and radar configuration file path there.
 
-## Configuration
-Settings are managed in `settings.ini`.
+To verify the radar signal and configure visualization depth, run:
+```bash
+python calibrator.py
+```
+
+## Contribution & License
+
+- **License**: Distributed under the [Apache 2.0 License](LICENSE).
+- **Contributions**: Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change. PRs containing unreviewed, generated AI content will be closed.

@@ -13,7 +13,9 @@ class RadarConfig:
     def __init__(self, file_path: str):
         self.file_path = file_path
         with open(file_path) as f:
-            lines = [l.split() for l in f if l.strip() and not l.startswith("%")]
+            self.commands = [l.strip() for l in f if l.strip() and not l.startswith("%")]
+        
+        lines = [l.split() for l in self.commands]
         
         profile = {}
         frame = {}
@@ -133,6 +135,19 @@ class RadarSensor:
             except: pass
         for p in (self._cli, self._data):
             if p and p.is_open: p.close()
+
+    def get_meta(self) -> dict:
+        return {
+            "config": {
+                "commands": self.config.commands,
+                "rangeRes": self.config.rangeRes,
+                "dopMax": self.config.dopMax,
+                "numRangeBins": self.config.numRangeBins,
+                "numDopplerBins": self.config.numDopplerBins,
+                "ADCsamples": self.config.ADCsamples
+            },
+            "timestamp": time.time()
+        }
 
     @staticmethod
     def find_ti_ports():
