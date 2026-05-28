@@ -1,7 +1,28 @@
 import os
+import sys
 import configparser
 
-SETTINGS_PATH = "settings.ini"
+def get_base_path():
+    """Returns the base path for the application."""
+    if getattr(sys, 'frozen', False):
+        # If frozen, sys.executable is the path to the .exe
+        # In 'onedir' with 'contents_directory="libs"', the exe is in the root
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    if os.path.isabs(relative_path):
+        return relative_path
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = get_base_path()
+
+    return os.path.join(base_path, relative_path)
+
+SETTINGS_PATH = os.path.join(get_base_path(), "settings.ini")
 
 DEFAULTS = {
     'Radar': {
@@ -10,8 +31,8 @@ DEFAULTS = {
         'queue_maxsize': '300',
         'telemetry_interval': '10.0',
         'auto_detect_ports': 'true',
-        'cli_port': '/dev/ttyUSB0',  # Linux default as seen in user's previous output
-        'data_port': '/dev/ttyUSB1'
+        'cli_port': 'COM3',  # Windows default
+        'data_port': 'COM4'
     },
     'Calibrator': {
         'max_display_range_m': '5.0',

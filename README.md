@@ -38,8 +38,23 @@ Captured data is saved in a raw stream format. Each `.bin` file begins with a me
    ```bash
    pip install -r requirements.txt
    ```
+2. **Linux Serial Permissions**:
+   To access the radar serial ports without root privileges, add your user to the `dialout` group:
+   ```bash
+   sudo usermod -a -G dialout $USER
+   ```
+   *Note: You must log out and back in for this to take effect.*
 
-### Execution
+3. **Linux Performance Optimization (Optional)**:
+   By default, Linux buffers serial data for 16ms. To achieve a stable and high FPS, set the data port to low latency mode:
+   ```bash
+   # Install setserial if needed
+   sudo apt-get install setserial
+   # Set your data port (usually /dev/ttyUSB1) to low latency
+   sudo setserial /dev/ttyUSB1 low_latency
+   ```
+
+### Execution (Python)
 Run the application to start the data acquisition CLI:
 ```bash
 python recorder.py
@@ -50,6 +65,46 @@ To verify the radar signal and configure visualization depth, run:
 ```bash
 python calibrator.py
 ```
+
+### Execution (Standalone Binary)
+Once built (see below), navigate to the `dist/craton_radar/` directory:
+```bash
+# Run Recorder
+./radar_recorder
+
+# Run Calibrator
+./radar_calibrator
+```
+
+## Building from Source
+
+The project uses PyInstaller for creating standalone executables and Inno Setup for Windows installers.
+
+### Windows Build (x64)
+1. **Install PyInstaller**:
+   ```bash
+   pip install pyinstaller
+   ```
+2. **Run Build Script**:
+   ```bash
+   pyinstaller tools/windows/build.spec
+   ```
+   The output will be in `dist/craton_radar/`.
+3. **Generate Installer (Optional)**:
+   - Install [Inno Setup 6+](https://jrsoftware.org/isdl.php).
+   - Open `tools/windows/installer.iss` and click "Compile".
+   - The setup file will be created in `tools/windows/output/`.
+
+### Linux Build
+1. **Install PyInstaller**:
+   ```bash
+   pip install pyinstaller
+   ```
+2. **Run Build Script**:
+   ```bash
+   pyinstaller tools/linux/build.spec
+   ```
+   The output will be in `dist/craton_radar/`.
 
 ## Contribution & License
 

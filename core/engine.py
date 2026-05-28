@@ -2,7 +2,11 @@ import math
 import time
 import logging
 import serial
+import os
+import sys
 from serial.tools import list_ports
+
+from core.settings import resource_path
 
 log = logging.getLogger("RadarHardware")
 
@@ -11,12 +15,14 @@ _TI_VID = 0x0451
 
 class RadarConfig:
     def __init__(self, file_path: str):
-        self.file_path = file_path
-        with open(file_path) as f:
+        # Resolve path if it's the default or relative
+        self.file_path = resource_path(file_path)
+
+        with open(self.file_path) as f:
             self.commands = [l.strip() for l in f if l.strip() and not l.startswith("%")]
-        
+
         lines = [l.split() for l in self.commands]
-        
+
         profile = {}
         frame = {}
         for val in lines:
@@ -71,7 +77,18 @@ class RadarSensor:
 
     def connect_and_configure(self):
         self._cli = serial.Serial(self._cli_port, 115200, timeout=0.6)
-        self._data = serial.Serial(self._data_port, 921600, timeout=1.0)
+        # Reduced timeout to 0.01 for non-blocking data ingestion
+        self._data = serial.Serial(self._data_port, 921600, timeout=0.01)
+        
+        # Try to enable low latency mode on Linux (pySerial 3.5+)
+        try:
+            if hasattr(self._data, 'set_low_latency_mode'):
+                self._data.set_low_latency_mode(True)
+            elif hasattr(self._data, 'low_latency'):
+                self._data.low_latency = True
+        except Exception as e:
+            log.debug(f"Could not set low latency mode: {e}")
+
         self._data.reset_output_buffer()
         
         with open(self.config.file_path) as f:
@@ -99,12 +116,14 @@ class RadarSensor:
         if in_waiting > 0:
             self._buffer.extend(self._data.read(in_waiting))
         else:
+            # Short read to keep the loop moving if in_waiting is momentarily zero
             chunk = self._data.read(4096)
-            if not chunk: return None
-            self._buffer.extend(chunk)
+            if chunk:
+                self._buffer.extend(chunk)
 
-        if len(self._buffer) > 32768: # Buffer safety
-            idx = self._buffer.find(_MAGIC, 1)
+        # Buffer safety: Instead of wiping, just keep the last 128KB to prevent overflow
+        if len(self._buffer) > 131072:
+            idx = self._buffer.find(_MAGIC, -65536) # Look for magic in recent data
             self._buffer = self._buffer[idx:] if idx != -1 else bytearray()
             return None
 
@@ -117,7 +136,7 @@ class RadarSensor:
         if len(self._buffer) < 40: return None
 
         frame_len = int.from_bytes(self._buffer[12:16], byteorder="little")
-        if not (16 <= frame_len <= 32768):
+        if not (16 <= frame_len <= 65536): # Increased safety bound for complex TLVs
             self._buffer = self._buffer[8:]
             return None
 

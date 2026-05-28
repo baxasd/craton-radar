@@ -9,29 +9,30 @@ from datetime import datetime
 from collections import deque
 
 from core.engine import RadarSensor
-from core.settings import load_settings
+from core.settings import load_settings, resource_path
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 log = logging.getLogger("RadarCapture")
 
 class TelemetryTracker:
-    def __init__(self, interval: float = 10.0):
+    def __init__(self, interval: float = 3.0):
         self.interval = interval
-        self.start = time.time()
-        self.last = self.start
-        self.cap_times = deque(maxlen=100)
-        self.disk_times = deque(maxlen=100)
+        self.start_time = time.perf_counter()
+        self.last_time = self.start_time
+        self.cap_count = 0
 
-    def log_cap(self): self.cap_times.append(time.time())
-    def log_disk(self): self.disk_times.append(time.time())
+    def log_cap(self):
+        self.cap_count += 1
+
+    def log_disk(self):
+        pass # No longer needed
 
     def update(self):
-        now = time.time()
-        if now - self.last >= self.interval:
-            c_fps = (len(self.cap_times)-1)/(self.cap_times[-1]-self.cap_times[0]) if len(self.cap_times)>1 else 0
-            d_fps = (len(self.disk_times)-1)/(self.disk_times[-1]-self.disk_times[0]) if len(self.disk_times)>1 else 0
-            print(f"[{now-self.start:.1f}s] CAP: {c_fps:.1f} | DISK: {d_fps:.1f}")
-            self.last = now
+        now = time.perf_counter()
+        if now - self.last_time >= self.interval:
+            total_elapsed = now - self.start_time
+            print(f"[{total_elapsed:.1f}s] Recording Active | Total Frames: {self.cap_count}")
+            self.last_time = now
 
 class Writer(threading.Thread):
     def __init__(self, q: queue.Queue, path: str, tel: TelemetryTracker, meta: dict = None):
@@ -59,7 +60,7 @@ class Writer(threading.Thread):
 def run_capture():
     config = load_settings()
     cfg = config['Radar']
-    cfg_file = cfg.get('config_file')
+    cfg_file = resource_path(cfg.get('config_file'))
     out_dir = cfg.get('out_dir', 'data')
 
     if not os.path.exists(cfg_file):
@@ -87,13 +88,23 @@ def run_capture():
     print("\nCapture started. Press Ctrl+C to stop.")
     try:
         while True:
-            raw = radar.read_raw_frame()
-            if raw:
+            frame_found = False
+            # Drain the serial buffer as fast as possible
+            while True:
+                raw = radar.read_raw_frame()
+                if not raw:
+                    break
+                
+                frame_found = True
                 tel.log_cap()
-                try: q.put_nowait((time.perf_counter_ns(), raw))
-                except queue.Full: pass
+                try: 
+                    q.put_nowait((time.perf_counter_ns(), raw))
+                except queue.Full: 
+                    pass
+            
             tel.update()
-            if not raw: time.sleep(0.001)
+            if not frame_found:
+                time.sleep(0.0001) # Only sleep if no data was found
     except KeyboardInterrupt:
         print("\nStopping capture...")
     finally:

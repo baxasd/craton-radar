@@ -141,11 +141,16 @@ def radar_worker(parser: RadarParser, radar: RadarSensor):
     print("Radar Active. Streaming data...")
     thread = threading.current_thread()
     while getattr(thread, "do_run", True):
-        raw = radar.read_raw_frame()
-        if raw:
+        frame_found = False
+        while True:
+            raw = radar.read_raw_frame()
+            if not raw:
+                break
+            frame_found = True
             parser.parse_frame(raw)
-        else:
-            time.sleep(0.005) # Yield to system
+            
+        if not frame_found:
+            time.sleep(0.0001)
     radar.close()
 
 def main():
