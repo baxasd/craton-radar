@@ -42,7 +42,7 @@ a_cal = Analysis(
 )
 
 # Merge Analysis
-MERGE((a_rec, 'recorder', 'radar_recorder'), (a_cal, 'calibrator', 'radar_calibrator'))
+MERGE((a_rec, 'recorder', 'Recorder'), (a_cal, 'calibrator', 'Calibrator'))
 
 pyz_rec = PYZ(a_rec.pure, a_rec.zipped_data, cipher=block_cipher)
 pyz_cal = PYZ(a_cal.pure, a_cal.zipped_data, cipher=block_cipher)
@@ -52,7 +52,7 @@ exe_rec = EXE(
     a_rec.scripts,
     [],
     exclude_binaries=True,
-    name='radar_recorder',
+    name='Recorder',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -71,7 +71,7 @@ exe_cal = EXE(
     a_cal.scripts,
     [],
     exclude_binaries=True,
-    name='radar_calibrator',
+    name='Calibrator',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -97,6 +97,6 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='craton_radar',
+    name='Radar',
     contents_directory='libs'
 )

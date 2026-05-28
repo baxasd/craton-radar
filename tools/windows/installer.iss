@@ -4,8 +4,8 @@
 #define MyAppName "Craton Radar"
 #define MyAppVersion "1.0"
 #define MyAppPublisher "Craton"
-#define MyAppExeNameRec "radar_recorder.exe"
-#define MyAppExeNameCal "radar_calibrator.exe"
+#define MyAppExeNameRec "Recorder.exe"
+#define MyAppExeNameCal "Calibrator.exe"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
@@ -32,7 +32,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "..\dist\craton_radar\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\dist\craton_radar\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]

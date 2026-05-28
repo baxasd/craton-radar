@@ -5,9 +5,9 @@ import configparser
 def get_base_path():
     """Returns the base path for the application."""
     if getattr(sys, 'frozen', False):
-        # If frozen, sys.executable is the path to the .exe
-        # In 'onedir' with 'contents_directory="libs"', the exe is in the root
-        return os.path.dirname(sys.executable)
+        root_base = sys._MEIPASS
+        libs_path = os.path.join(root_base, 'libs')
+        return libs_path if os.path.exists(libs_path) else root_base
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def resource_path(relative_path):

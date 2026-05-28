@@ -1,5 +1,7 @@
 # Craton Radar
 
+Version: v0.1.0
+
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://www.python.org/) 
 [![TI mmWave](https://img.shields.io/badge/TI_mmWave-Serial-red.svg?style=flat)](https://www.ti.com/sensors/mmwave/overview.html)
 [![DearPyGui](https://img.shields.io/badge/DearPyGui-2.0-blue.svg?style=flat)](https://github.com/hoffstadt/DearPyGui)
@@ -70,10 +72,10 @@ python calibrator.py
 Once built (see below), navigate to the `dist/craton_radar/` directory:
 ```bash
 # Run Recorder
-./radar_recorder
+./Recorder
 
 # Run Calibrator
-./radar_calibrator
+./Calibrator
 ```
 
 ## Building from Source
