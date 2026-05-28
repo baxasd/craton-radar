@@ -19,9 +19,19 @@ class RadarConfig:
         frame = {}
         for val in lines:
             if val[0] == "profileCfg":
-                profile = {"numADCsamples": int(val[10])}
+                profile = {
+                    "startFreq": float(val[2]),
+                    "idleTime": float(val[3]),
+                    "rampEndTime": float(val[5]),
+                    "freqSlopeConst": float(val[8]),
+                    "numADCsamples": int(val[10]),
+                    "digOutSampleRate": float(val[11])
+                }
             if val[0] == "frameCfg":
                 frame = {"numLoops": int(val[3])}
+            if val[0] == "chirpCfg":
+                # Rough count of TX antennas (assuming multiple chirpCfgs means MIMO)
+                profile["numTx"] = profile.get("numTx", 0) + 1
         
         if not profile:
             raise ValueError(f"No profileCfg found in {file_path}")
@@ -29,6 +39,24 @@ class RadarConfig:
         self.ADCsamples = profile.get("numADCsamples", 64)
         self.numRangeBins = 1 if self.ADCsamples == 0 else 2 ** math.ceil(math.log2(self.ADCsamples))
         self.numDopplerBins = frame.get("numLoops", 32)
+        
+        # Calculate range and velocity resolutions
+        try:
+            c = 3e8
+            dig_out = profile["digOutSampleRate"] * 1e3
+            freq_slope = profile["freqSlopeConst"] * 1e12
+            
+            sweep_bw = freq_slope * (self.ADCsamples / dig_out)
+            self.rangeRes = c / (2 * sweep_bw)
+            
+            num_tx = max(1, profile.get("numTx", 1))
+            tc = (profile["idleTime"] + profile["rampEndTime"]) * 1e-6
+            lam = c / (profile["startFreq"] * 1e9)
+            
+            self.dopMax = lam / (4 * num_tx * tc)
+        except Exception as e:
+            self.rangeRes = 0.044  # Fallback
+            self.dopMax = 5.0      # Fallback
 
 class RadarSensor:
     def __init__(self, cli_port: str, data_port: str, config_file: str):

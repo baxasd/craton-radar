@@ -3,11 +3,11 @@ import logging
 import queue
 import os
 import threading
-import configparser
 from datetime import datetime
 from collections import deque
 
 from core.engine import RadarSensor
+from core.settings import load_settings
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 log = logging.getLogger("RadarCapture")
@@ -48,19 +48,9 @@ class Writer(threading.Thread):
                     self.q.task_done()
                 except queue.Empty: continue
 
-def load_settings():
-    path = "settings.ini"
-    config = configparser.ConfigParser()
-    if not os.path.exists(path):
-        config['Radar'] = {'config_file': 'core/config.cfg', 'out_dir': 'data', 
-                           'queue_maxsize': '300', 'telemetry_interval': '10.0',
-                           'auto_detect_ports': 'true', 'cli_port': 'COM3', 'data_port': 'COM4'}
-        with open(path, 'w') as f: config.write(f)
-    config.read(path)
-    return config['Radar']
-
 def run_capture():
-    cfg = load_settings()
+    config = load_settings()
+    cfg = config['Radar']
     cfg_file = cfg.get('config_file')
     out_dir = cfg.get('out_dir', 'data')
     
