@@ -68,29 +68,36 @@ def update_gui(parser):
 
     if rb > 0 and db > 0 and hm_copy.size == rb * db:
         try:
-            # Reshape to 2D for zoom
+            # Reshape to 2D
             hm_2d = hm_copy.reshape((rb, db))
-            # Zoom by a factor of 4 for better visual resolution
-            hm_zoomed = ndimage.zoom(hm_2d, 4, order=1)
+            
+            # Shift doppler so 0 is in the middle
+            hm_2d = np.fft.fftshift(hm_2d, axes=1)
+            
+            # Zoom by a factor of 2 (instead of 4 to save CPU) for smooth look
+            # ndimage.zoom is slow, but at 2x it's acceptable for now
+            hm_zoomed = ndimage.zoom(hm_2d, 2, order=1)
             new_rb, new_db = hm_zoomed.shape
             
             flat_data = hm_zoomed.flatten().tolist()
             
             if not dpg.does_alias_exist("heatmap_series"):
-                dpg.set_axis_limits("hm_x_axis", 0, new_db)
-                dpg.set_axis_limits("hm_y_axis", 0, new_rb)
                 dpg.add_heat_series(
                     flat_data, new_rb, new_db, 
                     label="Range-Doppler", 
                     parent="hm_y_axis", 
                     tag="heatmap_series",
-                    scale_min=0, scale_max=5,
-                    format="",
-                    bounds_min=(0, 0), bounds_max=(new_db, new_rb)
+                    scale_min=0, scale_max=4,
+                    bounds_min=(-db//2, 0), bounds_max=(db//2, rb)
                 )
             else:
                 dpg.set_value("heatmap_series", [flat_data])
+                
+            # Update plot title with simple FPS (estimated)
+            dpg.set_item_label("heatmap_plot", f"Range-Doppler Heatmap ({rb}x{db} bins)")
+            
         except Exception as e:
+            # print(f"Update error: {e}")
             pass
 
 def radar_thread(parser, radar):
@@ -127,22 +134,56 @@ def main():
     
     dpg.create_context()
     
-    # Only render the heatmap in a full window
-    with dpg.window(tag="Primary Window"):
-        dpg.add_text("Range-Doppler Heatmap")
-        with dpg.colormap_registry(show=False):
-            dpg.add_colormap([[0,0,0], [0,0,255], [0,255,255], [0,255,0], [255,255,0], [255,0,0]], False, tag="viridis_ish")
+    with dpg.theme() as global_theme:
+        with dpg.theme_component(dpg.mvAll):
+            dpg.add_theme_style(dpg.mvStyleVar_WindowPadding, 10, 10)
+            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 5, 5)
+            dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, 8, 8)
+            dpg.add_theme_color(dpg.mvThemeCol_WindowBg, [20, 20, 25])
         
-        with dpg.plot(height=-1, width=-1, tag="heatmap_plot"):
-            dpg.add_plot_axis(dpg.mvXAxis, label="Doppler Bins", tag="hm_x_axis")
-            dpg.add_plot_axis(dpg.mvYAxis, label="Range Bins", tag="hm_y_axis")
-            dpg.bind_colormap("heatmap_plot", "viridis_ish")
+        with dpg.theme_component(dpg.mvPlot):
+            dpg.add_theme_color(dpg.mvPlotCol_PlotBg, [10, 10, 12], category=dpg.mvThemeCat_Plots)
+            dpg.add_theme_color(dpg.mvPlotCol_AxisGrid, [40, 40, 45], category=dpg.mvThemeCat_Plots)
 
-    dpg.create_viewport(title='Radar Calibrator Dashboard', width=800, height=600)
+    dpg.bind_theme(global_theme)
+    
+    with dpg.window(tag="Primary Window"):
+        with dpg.group(horizontal=True):
+            dpg.add_text("CRATON RADAR CALIBRATOR", color=[0, 255, 127])
+            dpg.add_spacer(width=20)
+            dpg.add_text("Status: ONLINE", tag="status_text", color=[0, 255, 0])
+
+        dpg.add_separator()
+        dpg.add_spacer(height=5)
+        
+        with dpg.colormap_registry(show=False):
+            # A more professional "Turbo" or "Inferno" style colormap
+            dpg.add_colormap([
+                [0, 0, 40],       # Deep Blue
+                [0, 0, 255],      # Blue
+                [0, 255, 255],    # Cyan
+                [0, 255, 0],      # Green
+                [255, 255, 0],    # Yellow
+                [255, 0, 0],      # Red
+                [255, 255, 255]   # White (Peak)
+            ], False, tag="radar_cmap")
+        
+        with dpg.plot(height=-1, width=-1, tag="heatmap_plot", no_menus=True):
+            dpg.add_plot_legend()
+            dpg.add_plot_axis(dpg.mvXAxis, label="Velocity (Bins)", tag="hm_x_axis")
+            dpg.add_plot_axis(dpg.mvYAxis, label="Range (Bins)", tag="hm_y_axis")
+            dpg.bind_colormap("heatmap_plot", "radar_cmap")
+            
+            # Set initial axis limits
+            dpg.set_axis_limits("hm_y_axis", 0, radar.config.numRangeBins)
+            dpg.set_axis_limits("hm_x_axis", -radar.config.numDopplerBins//2, radar.config.numDopplerBins//2)
+
+    dpg.create_viewport(title='Radar Calibrator Dashboard', width=1000, height=800)
     dpg.setup_dearpygui()
     dpg.show_viewport()
     dpg.set_primary_window("Primary Window", True)
     
+    # Use a fixed frame rate for UI to keep CPU usage sane
     while dpg.is_dearpygui_running():
         update_gui(parser)
         dpg.render_dearpygui_frame()

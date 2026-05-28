@@ -16,15 +16,19 @@ class RadarConfig:
             lines = [l.split() for l in f if l.strip() and not l.startswith("%")]
         
         profile = {}
+        frame = {}
         for val in lines:
-            if val[0] == "profileCfg" and int(val[1]) == 0:
+            if val[0] == "profileCfg":
                 profile = {"numADCsamples": int(val[10])}
+            if val[0] == "frameCfg":
+                frame = {"numLoops": int(val[3])}
         
         if not profile:
             raise ValueError(f"No profileCfg found in {file_path}")
             
-        self.ADCsamples = profile["numADCsamples"]
+        self.ADCsamples = profile.get("numADCsamples", 64)
         self.numRangeBins = 1 if self.ADCsamples == 0 else 2 ** math.ceil(math.log2(self.ADCsamples))
+        self.numDopplerBins = frame.get("numLoops", 32)
 
 class RadarSensor:
     def __init__(self, cli_port: str, data_port: str, config_file: str):
