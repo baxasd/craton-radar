@@ -106,10 +106,10 @@ class RadarSensor:
     def find_ti_ports():
         cli = data = None
         for p in list_ports.comports():
-            desc = p.description or ""
-            if "Application/User UART" in desc or "Enhanced COM Port" in desc: cli = p.device
-            elif "Auxiliary Data Port" in desc or "Standard COM Port" in desc: data = p.device
-            elif getattr(p, "vid", None) == _TI_VID:
+            desc = (p.description or "").lower()
+            if "application/user uart" in desc or "enhanced com port" in desc: cli = p.device
+            elif "auxiliary data port" in desc or "standard com port" in desc: data = p.device
+            elif getattr(p, "vid", None) in (_TI_VID, 0x10c4):
                 if cli is None: cli = p.device
                 elif data is None: data = p.device
         return cli, data
